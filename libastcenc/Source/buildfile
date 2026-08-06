@@ -1,0 +1,41 @@
+intf_libs = # Interface dependencies.
+impl_libs = # Implementation dependencies.
+#import xxxx_libs += libhello%lib{hello}
+
+lib{astcenc}: {hxx ixx txx cxx}{**} $impl_libs $intf_libs
+
+# Build options.
+#
+cxx.poptions =+ "-I$out_root" "-I$src_root"
+
+#obja{*}: cxx.poptions += -DSOURCE_STATIC_BUILD
+#objs{*}: cxx.poptions += -DSOURCE_SHARED_BUILD
+
+# Export options.
+#
+lib{astcenc}:
+{
+  cxx.export.poptions = "-I$out_root" "-I$src_root"
+  cxx.export.libs = $intf_libs
+}
+
+#liba{astcenc}: cxx.export.poptions += -DSOURCE_STATIC
+#libs{astcenc}: cxx.export.poptions += -DSOURCE_SHARED
+
+# For pre-releases use the complete version to make sure they cannot
+# be used in place of another pre-release or the final version. See
+# the version module for details on the version.* variable values.
+#
+if $version.pre_release
+  lib{astcenc}: bin.lib.version = "-$version.project_id"
+else
+  lib{astcenc}: bin.lib.version = "-$version.major.$version.minor"
+
+# Install into the Source/ subdirectory of, say, /usr/include/
+# recreating subdirectories.
+#
+{hxx ixx txx}{*}:
+{
+  install         = include/Source/
+  install.subdirs = true
+}
