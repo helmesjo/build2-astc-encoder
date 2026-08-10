@@ -1,0 +1,5 @@
+astcenc
+
+# Testscript output directory (can be symlink).
+#
+test-astcenc

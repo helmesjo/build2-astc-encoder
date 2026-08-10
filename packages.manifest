@@ -3,3 +3,6 @@ location: libastcenc/
 
 :
 location: libastcenc-tests/
+
+:
+location: astcenc/
