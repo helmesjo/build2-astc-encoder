@@ -6,7 +6,7 @@ cxx.std = latest
 
 using cxx
 
-hxx{*}: extension = hpp
+hxx{*}: extension = h
 ixx{*}: extension = ipp
 txx{*}: extension = tpp
 cxx{*}: extension = cpp
@@ -14,3 +14,10 @@ cxx{*}: extension = cpp
 # The test target for cross-testing (running tests under Wine, etc).
 #
 test.target = $cxx.target
+
+# Every exe{} in this package is a test. Do not install.
+#
+exe{*}:
+{
+  test = true
+}

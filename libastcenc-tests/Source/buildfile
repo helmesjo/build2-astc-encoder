@@ -1,6 +1,49 @@
-libs =
-#import libs += libhello%lib{hello}
+import! [metadata, rule_hint=cxx.link] lib = libastcenc%lib{astcenc}
+import libs = libastcenc%liba{astcenc} \
+              gtest%liba{gtest_main}
 
-exe{libastcenc-tests}: {hxx ixx txx cxx}{**} $libs testscript
+# Match the linked libastcenc build (private headers need the same ISA flags).
+#
+astcenc_isa              = [string] $($lib: libastcenc.isa)
+astcenc_decompress_only  = [bool]   $($lib: libastcenc.decompress_only)
+astcenc_invariance       = [bool]   $($lib: libastcenc.invariance)
+astcenc_x86_gathers      = [bool]   $($lib: libastcenc.x86_gathers)
+astcenc_block_max_texels = [uint64] $($lib: libastcenc.block_max_texels)
+astcenc_big_endian       = [bool]   $($lib: libastcenc.big_endian)
 
-cxx.poptions =+ "-I$out_root" "-I$src_root"
+# Upstream builds one unit-test binary with all four translation units
+# (see Source/UnitTest/cmake_core.cmake).
+#
+# Sibling Source/*.h are required for relative includes from UnitTest/ and
+# must be prerequisites so dist ships them.
+#
+exe{test-unit}:
+{
+  test.arguments = --gtest_brief=1
+}
+
+# Later dependency lines append. Keep sources before $libs across the split.
+#
+exe{test-unit}: UnitTest/cxx{** -test_encode -test_decode} hxx{** -UnitTest/**}
+exe{test-unit}: UnitTest/cxx{test_encode}: include = (!$astcenc_decompress_only)
+exe{test-unit}: UnitTest/cxx{test_decode}: include = (!$astcenc_decompress_only)
+exe{test-unit}: $libs
+
+# Quoted includes in UnitTest sources are relative to Source/UnitTest/
+# (../astcenc.h, ../astcenc_internal.h). Sibling private headers live in
+# Source/ via symlinks. Also keep Source/ on the include path for headers
+# that include each other by basename.
+#
+cxx.poptions =+ "-I$out_base" "-I$src_base"
+
+# Symlink of libastcenc/build/export/astcenc-isa.build.
+# During CI test-installed this is not importable from libastcenc.
+#
+import [once] buildfile{astcenc-isa}
+
+cxx.poptions += $astcenc_poptions
+cxx.coptions += $astcenc_coptions
+
+# Headers under Source/ are private packaging aids, not installed.
+#
+hxx{*}: install = false

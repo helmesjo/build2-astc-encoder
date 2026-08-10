@@ -30,3 +30,7 @@
 # Compilation database.
 #
 compile_commands.json
+
+# Test executables.
+#
+test-unit

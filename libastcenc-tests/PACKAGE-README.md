@@ -1,45 +1,16 @@
-# libastcenc-tests - About
+# libastcenc-tests - libastcenc (tests)
 
-This is a `build2` package for the [`<UPSTREAM-NAME>`](https://<UPSTREAM-URL>)
-executable. It is a <SUMMARY-OF-FUNCTIONALITY>.
-
-Note that the `libastcenc-tests` executable in this package provides `build2` metadata.
-
-
-## Usage
-
-To start using `libastcenc-tests` in your project, add the following build-time
-`depends` value to your `manifest`, adjusting the version constraint as
-appropriate:
-
-```
-depends: * libastcenc-tests ^<VERSION>
-```
-
-Then import the executable in your `buildfile`:
-
-```
-import! [metadata] <TARGET> = libastcenc-tests%exe{<TARGET>}
-```
+This is a `build2` package containing the test suite for the
+[`astc-encoder`](https://github.com/ARM-software/astc-encoder) library.
+Upstream googletest unit tests, using the `gtest` package instead of the
+bundled GoogleTest. The Python image test suite is not included.
 
 
 ## Importable targets
 
-This package provides the following importable targets:
-
-```
-exe{<TARGET>}
-```
-
-<DESCRIPTION-OF-IMPORTABLE-TARGETS>
+This package exports no targets.
 
 
 ## Configuration variables
 
-This package provides the following configuration variables:
-
-```
-[bool] config.libastcenc_tests.<VARIABLE> ?= false
-```
-
-<DESCRIPTION-OF-CONFIG-VARIABLES>
+This package provides no configuration variables.
