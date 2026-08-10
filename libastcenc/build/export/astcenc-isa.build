@@ -1,0 +1,227 @@
+# Map astcenc_* configuration inputs to compile flags (upstream cmake_core.cmake).
+#
+# Inputs (must be set in the calling scope):
+#   $astcenc_isa               string  native|none|sse2|sse41|avx2|neon|sve128|sve256
+#   $astcenc_decompress_only   bool
+#   $astcenc_invariance        bool
+#   $astcenc_x86_gathers       bool
+#   $astcenc_block_max_texels  uint64  0 means header default (216)
+#   $astcenc_big_endian        bool    effective value (already resolved)
+#
+# Outputs:
+#   $astcenc_poptions            preprocessor defines (all TUs, including veneers)
+#   $astcenc_coptions            full ISA + FP (library, tests, CLI non-veneer)
+#   $astcenc_coptions_veneer1    no extended ISA + FP (astcenccli_entry)
+#   $astcenc_coptions_veneer2    SVE without VLEN override + FP (astcenccli_entry2)
+#
+
+astcenc_poptions =
+astcenc_coptions_isa =
+astcenc_coptions_veneer1_isa =
+astcenc_coptions_veneer2_isa =
+
+# CMake frontend classes (cmake_compiler.cmake).
+#
+astcenc_gnu_fe  = ($cxx.class != 'msvc')
+astcenc_msvccl  = ($cxx.class == 'msvc' && $cxx.id != 'clang')
+astcenc_clangcl = ($cxx.class == 'msvc' && $cxx.id == 'clang')
+
+# Conservative x86 flags for both veneers (upstream VENEER_TYPE > 0).
+#
+astcenc_coptions_veneer_x86 =
+if $astcenc_gnu_fe
+  astcenc_coptions_veneer_x86 = -msse2 -mno-sse4.1
+
+# Reject only pairings that cannot work. none and native stay valid on
+# every CPU. Arm NEON is allowed on 32-bit and 64-bit. SVE is AArch64 only.
+#
+if ($astcenc_isa == 'sse2' || $astcenc_isa == 'sse41' || $astcenc_isa == 'avx2')
+{
+  if! $regex.match($cxx.target.cpu, 'x86_64.*|i[3-6]86.*|x86.*|amd64.*')
+    fail "config.libastcenc.isa=$astcenc_isa requires an x86 target (got $cxx.target.cpu)"
+}
+elif ($astcenc_isa == 'neon')
+{
+  if! $regex.match($cxx.target.cpu, 'aarch64.*|arm64.*|arm.*')
+    fail "config.libastcenc.isa=neon requires an Arm target (got $cxx.target.cpu)"
+}
+elif ($astcenc_isa == 'sve128' || $astcenc_isa == 'sve256')
+{
+  if! $regex.match($cxx.target.cpu, 'aarch64.*|arm64.*')
+    fail "config.libastcenc.isa=$astcenc_isa requires AArch64 (got $cxx.target.cpu)"
+}
+
+switch $astcenc_isa
+{
+  case 'none'
+  {
+    astcenc_poptions = -DASTCENC_NEON=0 -DASTCENC_SVE=0 -DASTCENC_SSE=0 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=0 -DASTCENC_F16C=0
+  }
+  case 'neon'
+  {
+    astcenc_poptions = -DASTCENC_NEON=1 -DASTCENC_SVE=0 -DASTCENC_SSE=0 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=0 -DASTCENC_F16C=0
+  }
+  case 'sve128'
+  {
+    astcenc_poptions = -DASTCENC_NEON=1 -DASTCENC_SVE=4 -DASTCENC_SSE=0 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=0 -DASTCENC_F16C=0
+
+    if ($cxx.class != 'msvc')
+    {
+      astcenc_coptions_isa += -march=armv8-a+sve
+      astcenc_coptions_veneer2_isa += -march=armv8-a+sve
+    }
+  }
+  case 'sve256'
+  {
+    astcenc_poptions = -DASTCENC_NEON=1 -DASTCENC_SVE=8 -DASTCENC_SSE=0 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=0 -DASTCENC_F16C=0
+
+    if ($cxx.class != 'msvc')
+    {
+      astcenc_coptions_isa += -march=armv8-a+sve -msve-vector-bits=256
+      astcenc_coptions_veneer2_isa += -march=armv8-a+sve
+    }
+  }
+  case 'sse2'
+  {
+    astcenc_poptions = -DASTCENC_NEON=0 -DASTCENC_SVE=0 -DASTCENC_SSE=20 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=0 -DASTCENC_F16C=0 \
+                       -DASTCENC_X86_GATHERS=0
+
+    if $astcenc_gnu_fe
+    {
+      astcenc_coptions_isa += -msse2 -mno-sse4.1
+      astcenc_coptions_veneer1_isa += $astcenc_coptions_veneer_x86
+      astcenc_coptions_veneer2_isa += $astcenc_coptions_veneer_x86
+    }
+    elif $astcenc_clangcl
+      astcenc_coptions_isa += -msse2
+  }
+  case 'sse41'
+  {
+    astcenc_poptions = -DASTCENC_NEON=0 -DASTCENC_SVE=0 -DASTCENC_SSE=41 \
+                       -DASTCENC_AVX=0 -DASTCENC_POPCNT=1 -DASTCENC_F16C=0 \
+                       -DASTCENC_X86_GATHERS=0
+
+    if ($astcenc_gnu_fe || $astcenc_clangcl)
+      astcenc_coptions_isa += -msse4.1 -mpopcnt
+
+    astcenc_coptions_veneer1_isa += $astcenc_coptions_veneer_x86
+    astcenc_coptions_veneer2_isa += $astcenc_coptions_veneer_x86
+  }
+  case 'avx2'
+  {
+    gathers = ($astcenc_x86_gathers ? 1 : 0)
+
+    astcenc_poptions = -DASTCENC_NEON=0 -DASTCENC_SVE=0 -DASTCENC_SSE=41 \
+                       -DASTCENC_AVX=2 -DASTCENC_POPCNT=1 -DASTCENC_F16C=1 \
+                       "-DASTCENC_X86_GATHERS=$gathers"
+
+    if ($cxx.class == 'msvc')
+      astcenc_coptions_isa += /arch:AVX2
+    if ($astcenc_gnu_fe || $astcenc_clangcl)
+      astcenc_coptions_isa += -mavx2 -mpopcnt -mf16c
+
+    # CMake: -mfma on GNU-frontend non-veneer AVX2 when invariance is off.
+    #
+    if (!$astcenc_invariance && $astcenc_gnu_fe)
+      astcenc_coptions_isa += -mfma
+
+    astcenc_coptions_veneer1_isa += $astcenc_coptions_veneer_x86
+    astcenc_coptions_veneer2_isa += $astcenc_coptions_veneer_x86
+  }
+  case 'native'
+  {
+    # Leave ASTCENC_* for auto-detection in astcenc_mathlib.h.
+    # Veneers must not get -march=native (upstream VENEER_TYPE > 0).
+    #
+    if ($cxx.class != 'msvc')
+      astcenc_coptions_isa += -march=native
+  }
+  default
+    fail "unknown astcenc_isa value (expected native|none|sse2|sse41|avx2|neon|sve128|sve256)"
+}
+
+if $astcenc_decompress_only
+  astcenc_poptions += -DASTCENC_DECOMPRESS_ONLY
+
+# Callers that have not been updated yet leave these unset.
+#
+if (!$defined(astcenc_block_max_texels))
+  astcenc_block_max_texels = 0
+
+if (!$defined(astcenc_big_endian))
+  astcenc_big_endian = false
+
+if ($astcenc_block_max_texels != 0)
+  astcenc_poptions += "-DASTCENC_BLOCK_MAX_TEXELS=$astcenc_block_max_texels"
+
+# SIMD backends are little-endian only (upstream Building-BE.md). none is the
+# supported BE backend. native is left alone (compiler defaults, no forced
+# ISA macros).
+#
+if ($astcenc_big_endian && \
+    $astcenc_isa != 'none' && \
+    $astcenc_isa != 'native')
+  fail "SIMD backends are little-endian only. Use config.libastcenc.isa=none on a big-endian target."
+
+# CMake defines ASTCENC_BIG_ENDIAN only for the none backend.
+#
+if ($astcenc_big_endian && $astcenc_isa == 'none')
+  astcenc_poptions += -DASTCENC_BIG_ENDIAN=1
+
+astcenc_coptions_fp =
+astcenc_msvc_ge_1930 = ($cxx.version.major > 19 || \
+                        ($cxx.version.major == 19 && $cxx.version.minor >= 30))
+
+if! $astcenc_invariance
+{
+  astcenc_poptions += -DASTCENC_NO_INVARIANCE=1
+
+  if $astcenc_gnu_fe
+    astcenc_coptions_fp += -ffp-contract=fast -fno-math-errno
+  elif $astcenc_msvccl
+  {
+    astcenc_coptions_fp += /fp:precise
+    if $astcenc_msvc_ge_1930
+      astcenc_coptions_fp += /fp:contract
+  }
+  elif $astcenc_clangcl
+  {
+    astcenc_coptions_fp += /fp:precise
+    if ($cxx.version.major >= 14)
+      astcenc_coptions_fp += -Xclang -ffp-contract=fast
+  }
+}
+else
+{
+  if $astcenc_gnu_fe
+    astcenc_coptions_fp += -ffp-contract=off -fno-math-errno
+  elif $astcenc_msvccl
+  {
+    if $astcenc_msvc_ge_1930
+      astcenc_coptions_fp += /fp:precise
+    else
+      astcenc_coptions_fp += /fp:strict
+  }
+  elif $astcenc_clangcl
+  {
+    astcenc_coptions_fp += /fp:precise
+    if ($cxx.version.major >= 14)
+      astcenc_coptions_fp += -Xclang -ffp-contract=off
+  }
+}
+
+# CMake: -fno-unsafe-math-optimizations for GNU-frontend Clang 10+ in both
+# invariance modes. Not applied to clang-cl. Use id.type so Apple Clang
+# (cxx.id = clang-apple) is included.
+#
+if ($cxx.id.type == 'clang' && $cxx.class != 'msvc' && $cxx.version.major >= 10)
+  astcenc_coptions_fp += -fno-unsafe-math-optimizations
+
+astcenc_coptions         = $astcenc_coptions_isa $astcenc_coptions_fp
+astcenc_coptions_veneer1 = $astcenc_coptions_veneer1_isa $astcenc_coptions_fp
+astcenc_coptions_veneer2 = $astcenc_coptions_veneer2_isa $astcenc_coptions_fp

@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_ideal_endpoints_and_weights.cpp

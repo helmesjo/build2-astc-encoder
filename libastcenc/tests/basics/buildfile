@@ -1,3 +1,10 @@
+import! [metadata, rule_hint=cxx.link] lib = libastcenc%lib{astcenc}
 import libs = libastcenc%lib{astcenc}
 
-exe{driver}: {hxx ixx txx cxx}{**} $libs testscript{**}
+exe{driver}: {hxx cxx}{**} $libs
+
+# The public header does not export ASTCENC_DECOMPRESS_ONLY. Pass it so the
+# smoke test can skip compress and set ASTCENC_FLG_DECOMPRESS_ONLY.
+#
+if ($($lib: libastcenc.decompress_only))
+  cxx.poptions += -DASTCENC_DECOMPRESS_ONLY

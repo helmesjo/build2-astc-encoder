@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_partition_tables.cpp

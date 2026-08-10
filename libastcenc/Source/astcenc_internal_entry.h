@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_internal_entry.h

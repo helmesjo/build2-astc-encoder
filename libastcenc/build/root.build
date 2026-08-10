@@ -5,8 +5,9 @@
 cxx.std = latest
 
 using cxx
+using cxx.predefs
 
-hxx{*}: extension = hpp
+hxx{*}: extension = h
 ixx{*}: extension = ipp
 txx{*}: extension = tpp
 cxx{*}: extension = cpp
@@ -14,3 +15,42 @@ cxx{*}: extension = cpp
 # The test target for cross-testing (running tests under Wine, etc).
 #
 test.target = $cxx.target
+
+# SIMD backend (matches upstream ASTCENC_ISA_* CMake options).
+# Values: native, none, sse2, sse41, avx2, neon, sve128, sve256
+#
+# Default is a portable production baseline for the target, not upstream's
+# ASTCENC_ISA_NATIVE (-march=native) and not the scalar none backend.
+#
+astcenc_isa_default = none
+if $regex.match($cxx.target.cpu, 'x86_64.*')
+  astcenc_isa_default = sse2
+elif ($cxx.target.cpu == 'aarch64' || $regex.match($cxx.target.cpu, 'arm64.*'))
+  astcenc_isa_default = neon
+
+# Known big-endian names (aarch64_be, armeb, powerpc, s390, sparc) stay on
+# none. Do not match aarch64.* here, that would swallow aarch64_be.
+
+config [string] config.libastcenc.isa ?= $astcenc_isa_default
+
+# Build a decompress-only library (ASTCENC_DECOMPRESS_ONLY).
+#
+config [bool] config.libastcenc.decompress_only ?= false
+
+# Floating-point invariance (upstream ASTCENC_INVARIANCE, default ON).
+#
+config [bool] config.libastcenc.invariance ?= true
+
+# Use native x86 gathers in the avx2 backend (upstream ASTCENC_X86_GATHERS).
+#
+config [bool] config.libastcenc.x86_gathers ?= true
+
+# Limit supported ASTC block sizes (upstream ASTCENC_BLOCK_MAX_TEXELS).
+# 0 means unset, the header default of 216 (all 2D and 3D sizes).
+#
+config [uint64] config.libastcenc.block_max_texels ?= 0
+
+# Big-endian target (upstream ASTCENC_BIG_ENDIAN).
+# null means auto-detect via the HAVE_BIGENDIAN autoconf check.
+#
+config [bool, null] config.libastcenc.big_endian ?= [null]

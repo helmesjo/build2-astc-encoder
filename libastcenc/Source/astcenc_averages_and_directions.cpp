@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_averages_and_directions.cpp

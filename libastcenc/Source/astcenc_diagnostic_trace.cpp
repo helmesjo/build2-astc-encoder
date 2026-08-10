@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_diagnostic_trace.cpp

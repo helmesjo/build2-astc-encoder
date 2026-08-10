@@ -1,26 +1,103 @@
 intf_libs = # Interface dependencies.
 impl_libs = # Implementation dependencies.
-#import xxxx_libs += libhello%lib{hello}
 
-lib{astcenc}: {hxx ixx txx cxx}{**} $impl_libs $intf_libs
+# Public header plus private headers and library sources (CLI excluded).
+#
+./: lib{astcenc}
+
+lib{astcenc}: {hxx cxx}{** -predef} $impl_libs $intf_libs
 
 # Build options.
 #
-cxx.poptions =+ "-I$out_root" "-I$src_root"
+# Source/ is both the public include root (<astcenc.h>) and the private
+# header location, matching upstream CMake (BUILD_INTERFACE = Source/).
+#
+cxx.poptions =+ "-I$out_base" "-I$src_base"
 
-#obja{*}: cxx.poptions += -DSOURCE_STATIC_BUILD
-#objs{*}: cxx.poptions += -DSOURCE_SHARED_BUILD
+# Map config.libastcenc.* to ASTCENC_* macros and arch flags.
+#
+astcenc_isa              = $config.libastcenc.isa
+astcenc_decompress_only  = $config.libastcenc.decompress_only
+astcenc_invariance       = $config.libastcenc.invariance
+astcenc_x86_gathers      = $config.libastcenc.x86_gathers
+astcenc_block_max_texels = $config.libastcenc.block_max_texels
+
+# Detect target endianness (HAVE_BIGENDIAN builtin). Honor an explicit
+# config.libastcenc.big_endian override when the user sets one.
+#
+using autoconf
+
+hxx{predef}: in{predef}
+{
+  install = false
+}
+
+[rule_hint=cxx.predefs] buildfile{predef}: hxx{predef}
+{
+  cxx.predefs.poptions = false
+  cxx.predefs.macros = HAVE_BIGENDIAN
+}
+
+./: buildfile{predef}
+
+HAVE_BIGENDIAN = [bool] false
+
+if ($build.meta_operation == 'perform')
+{
+  update buildfile{predef}
+  source $path(buildfile{predef})
+  HAVE_BIGENDIAN = ($HAVE_BIGENDIAN == 1)
+}
+
+if ($config.libastcenc.big_endian == [null])
+  astcenc_big_endian = [bool] $HAVE_BIGENDIAN
+else
+  astcenc_big_endian = [bool] $config.libastcenc.big_endian
+
+# Shared ISA mapping (also imported by the CLI via buildfile{}).
+#
+source $src_root/build/export/astcenc-isa.build
+
+cxx.poptions += $astcenc_poptions
+cxx.coptions += $astcenc_coptions
+
+# Upstream shared library builds define ASTCENC_DYNAMIC_LIBRARY so that
+# ASTCENC_PUBLIC expands to the platform export attribute, and hide
+# everything else.
+#
+objs{*}: cxx.poptions += -DASTCENC_DYNAMIC_LIBRARY=1
+if ($cxx.class != 'msvc')
+  objs{*}: cxx.coptions += -fvisibility=hidden
+
+# System libraries (implementation only, not exported).
+#
+if ($cxx.target.system != 'win32-msvc')
+{
+  cxx.libs += -lm
+  cxx.libs += -pthread
+}
 
 # Export options.
 #
+# Consumers include the public C API as <astcenc.h>. ISA / feature defines are
+# not part of the public header interface.
+#
 lib{astcenc}:
 {
-  cxx.export.poptions = "-I$out_root" "-I$src_root"
+  cxx.export.poptions = "-I$src_base"
   cxx.export.libs = $intf_libs
-}
 
-#liba{astcenc}: cxx.export.poptions += -DSOURCE_STATIC
-#libs{astcenc}: cxx.export.poptions += -DSOURCE_SHARED
+  # Re-export configuration so CLI and unit tests can match this build.
+  #
+  export.metadata = 1 libastcenc
+
+  libastcenc.isa              = [string] $astcenc_isa
+  libastcenc.decompress_only  = [bool] $astcenc_decompress_only
+  libastcenc.invariance       = [bool] $astcenc_invariance
+  libastcenc.x86_gathers      = [bool] $astcenc_x86_gathers
+  libastcenc.block_max_texels = [uint64] $astcenc_block_max_texels
+  libastcenc.big_endian       = [bool] $astcenc_big_endian
+}
 
 # For pre-releases use the complete version to make sure they cannot
 # be used in place of another pre-release or the final version. See
@@ -31,11 +108,10 @@ if $version.pre_release
 else
   lib{astcenc}: bin.lib.version = "-$version.major.$version.minor"
 
-# Install into the Source/ subdirectory of, say, /usr/include/
-# recreating subdirectories.
+# Don't install private implementation headers.
 #
-{hxx ixx txx}{*}:
-{
-  install         = include/Source/
-  install.subdirs = true
-}
+hxx{*}: install = false
+
+# Install the public C API header into include/ (as <astcenc.h>).
+#
+hxx{astcenc}@./: install = include/

@@ -1,0 +1,1 @@
+../../upstream/Source/astcenc_vecmathlib_avx2_8.h
