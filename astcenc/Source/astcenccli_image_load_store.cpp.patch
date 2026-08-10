@@ -1,0 +1,15 @@
+--- astcenccli_image_load_store.cpp.orig	2026-08-06 20:09:23
++++ astcenccli_image_load_store.cpp	2026-08-13 23:43:51
+@@ -34,9 +34,9 @@
+ 
+ #include "astcenccli_internal.h"
+ 
+-#include "ThirdParty/stb_image.h"
+-#include "ThirdParty/stb_image_write.h"
+-#include "ThirdParty/tinyexr.h"
++#include <stb_image.h>
++#include <stb_image_write.h>
++#include <tinyexr.h>
+ 
+ /**
+  * @brief Reverse the bytes in a uint32_t value.

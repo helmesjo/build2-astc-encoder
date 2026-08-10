@@ -1,0 +1,34 @@
+--- astcenccli_image_external.cpp.orig	2026-08-06 20:09:23
++++ astcenccli_image_external.cpp	2026-08-13 23:43:35
+@@ -44,16 +44,6 @@
+ #define TINYEXR_USE_STB_ZLIB 1
+ #define TEXR_ASSERT(x) astcenc_runtime_assert(x)
+ 
+-// Configure the Wuffs library build.
+-#define WUFFS_IMPLEMENTATION
+-#define WUFFS_CONFIG__MODULES
+-#define WUFFS_CONFIG__MODULE__ADLER32
+-#define WUFFS_CONFIG__MODULE__BASE
+-#define WUFFS_CONFIG__MODULE__CRC32
+-#define WUFFS_CONFIG__MODULE__DEFLATE
+-#define WUFFS_CONFIG__MODULE__PNG
+-#define WUFFS_CONFIG__MODULE__ZLIB
+-
+ /**
+  * @brief Trap image load failures and convert into a runtime error.
+  */
+@@ -66,10 +56,10 @@
+     }
+ }
+ 
+-#include "ThirdParty/stb_image.h"
+-#include "ThirdParty/stb_image_write.h"
+-#include "ThirdParty/tinyexr.h"
+-#include "ThirdParty/wuffs-v0.3.c"
++#include <stb_image.h>
++#include <stb_image_write.h>
++#include <tinyexr.h>
++#include <wuffs/wuffs.h>
+ 
+ struct wuffs_image_deleter
+ {

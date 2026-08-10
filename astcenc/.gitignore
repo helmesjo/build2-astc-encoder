@@ -30,3 +30,8 @@
 # Compilation database.
 #
 compile_commands.json
+
+# Testscript output and forwarded binary.
+#
+astcenc
+test-astcenc

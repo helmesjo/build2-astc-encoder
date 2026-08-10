@@ -1,9 +1,9 @@
-# astcenc - About
+# astcenc
 
-This is a `build2` package for the [`<UPSTREAM-NAME>`](https://<UPSTREAM-URL>)
-executable. It is a <SUMMARY-OF-FUNCTIONALITY>.
-
-Note that the `astcenc` executable in this package provides `build2` metadata.
+This is a `build2` package for the
+[ARM astc-encoder](https://github.com/ARM-software/astc-encoder) command line
+tool. It compresses and decompresses Adaptive Scalable Texture Compression
+(ASTC) images.
 
 
 ## Usage
@@ -13,13 +13,13 @@ To start using `astcenc` in your project, add the following build-time
 appropriate:
 
 ```
-depends: * astcenc ^<VERSION>
+depends: * astcenc ^5.7.0
 ```
 
 Then import the executable in your `buildfile`:
 
 ```
-import! [metadata] <TARGET> = astcenc%exe{<TARGET>}
+import astcenc = astcenc%exe{astcenc}
 ```
 
 
@@ -28,18 +28,14 @@ import! [metadata] <TARGET> = astcenc%exe{<TARGET>}
 This package provides the following importable targets:
 
 ```
-exe{<TARGET>}
+exe{astcenc}
 ```
 
-<DESCRIPTION-OF-IMPORTABLE-TARGETS>
+The `astcenc` command line tool.
 
 
 ## Configuration variables
 
-This package provides the following configuration variables:
-
-```
-[bool] config.astcenc.<VARIABLE> ?= false
-```
-
-<DESCRIPTION-OF-CONFIG-VARIABLES>
+This package provides no configuration variables of its own. The CLI is built
+with the same ISA and feature flags as the linked `libastcenc` package
+(`config.libastcenc.*`).

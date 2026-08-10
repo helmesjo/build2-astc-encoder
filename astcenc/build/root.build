@@ -5,8 +5,9 @@
 cxx.std = latest
 
 using cxx
+using in
 
-hxx{*}: extension = hpp
+hxx{*}: extension = h
 ixx{*}: extension = ipp
 txx{*}: extension = tpp
 cxx{*}: extension = cpp

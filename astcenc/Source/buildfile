@@ -1,6 +1,82 @@
-libs =
-#import libs += libhello%lib{hello}
+import! [metadata, rule_hint=cxx.link] lib = libastcenc%lib{astcenc}
+import libs = libastcenc%liba{astcenc} \
+              stb_image%lib{stb_image} \
+              stb_image_write%lib{stb_image_write} \
+              libtinyexr%lib{tinyexr} \
+              libwuffs%lib{wuffs}
 
-exe{astcenc}: {hxx ixx txx cxx}{**} $libs testscript
+# Generated version header (upstream uses CMake configure_file).
+#
+hxx{astcenccli_version}: in{astcenccli_version}
+{
+  # CMake-style @VAR@ (lax so Doxygen @brief etc. in the header are left alone).
+  #
+  in.symbol = '@'
+  in.mode = lax
+  astcencoder_VERSION = "$version.major.$version.minor.$version.patch"
 
-cxx.poptions =+ "-I$out_root" "-I$src_root"
+  # Upstream cmake_core.cmake sets this with string(TIMESTAMP ... "%Y") at
+  # configure time (not a source macro, so not extractable via predefs).
+  # Pin the packaging-year for hermetic builds of this 5.7.0 release.
+  #
+  astcencoder_YEAR = 2026
+}
+
+# Upstream CLI sources (veneers + main + image I/O).
+#
+./: exe{astcenc}
+
+exe{astcenc}: {hxx cxx}{**} hxx{astcenccli_version} $libs testscript
+
+# Build options.
+#
+# Source/ provides CLI private headers and the generated version header.
+# Public <astcenc.h> comes from libastcenc. Image I/O comes from packages.
+#
+cxx.poptions =+ "-I$out_base" "-I$src_base"
+
+# Match the linked libastcenc build: re-read its config metadata and apply
+# the same ISA / feature flags (private headers and veneers need them).
+#
+astcenc_isa              = [string] $($lib: libastcenc.isa)
+astcenc_decompress_only  = [bool]   $($lib: libastcenc.decompress_only)
+astcenc_invariance       = [bool]   $($lib: libastcenc.invariance)
+astcenc_x86_gathers      = [bool]   $($lib: libastcenc.x86_gathers)
+astcenc_block_max_texels = [uint64] $($lib: libastcenc.block_max_texels)
+astcenc_big_endian       = [bool]   $($lib: libastcenc.big_endian)
+
+# Symlink of libastcenc/build/export/astcenc-isa.build.
+# During CI test-installed this is not importable from libastcenc.
+#
+import [once] buildfile{astcenc-isa}
+
+cxx.poptions += $astcenc_poptions
+
+# Veneers must not inherit extended ISA flags (upstream VENEER_TYPE).
+# astcenccli_entry is compiled without extended ISA so the CPU check cannot
+# SIGILL. astcenccli_entry2 sees native SVE vector length (no -msve-vector-bits).
+#
+obj{* -astcenccli_entry -astcenccli_entry2}: cxx.coptions += $astcenc_coptions
+obj{astcenccli_entry}:  cxx.coptions += $astcenc_coptions_veneer1
+obj{astcenccli_entry2}: cxx.coptions += $astcenc_coptions_veneer2
+
+if ($cxx.target.class == 'windows')
+  cxx.poptions += -D_CRT_SECURE_NO_WARNINGS
+
+# Third-party image amalgamation is noisy. Upstream also relaxes warnings on
+# astcenccli_image_external.cpp.
+#
+if ($cxx.id != 'msvc')
+  obj{astcenccli_image_external}: cxx.coptions += \
+    -fno-strict-aliasing \
+    -Wno-unused-function -Wno-unused-parameter -Wno-sign-conversion \
+    -Wno-implicit-int-conversion -Wno-double-promotion
+
+# System libraries (CLI uses pthreads for the worker pool on POSIX).
+#
+if ($cxx.target.system != 'win32-msvc')
+  cxx.libs += -pthread
+
+# Private headers are not installed.
+#
+hxx{*}: install = false

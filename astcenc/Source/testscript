@@ -1,9 +1,17 @@
-: basics
+: version
 :
-$* 'World' >'Hello, World!'
+# Double-quoted end marker expands $(version.*) and interprets escapes, so
+# use unescaped '.' as "any char" rather than '\.'.
+#
+$* -version >>~"/EOO/"
+/astcenc v$(version.major).$(version.minor).$(version.patch).*(\n)?/
+//
+/?
+/Copyright .c. 2011-.* Arm Limited. All rights reserved./
+//
+/?
+EOO
 
-: missing-name
+: help
 :
-$* 2>>EOE != 0
-error: missing name
-EOE
+$* -help >- 2>-
