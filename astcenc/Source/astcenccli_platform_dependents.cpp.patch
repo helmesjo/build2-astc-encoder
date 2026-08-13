@@ -1,0 +1,77 @@
+--- ./astcenccli_platform_dependents.cpp.orig	2026-08-13 11:50:37.404089400 +0200
++++ ./astcenccli_platform_dependents.cpp	2026-08-13 12:22:07.077242300 +0200
+@@ -50,6 +50,10 @@
+ #include <algorithm>
+ #include <cstring>
+ 
++#if defined(__MINGW32__)
++// MinGW already has real pthreads (winpthread). Do not redefine.
++#include <pthread.h>
++#else
+ /** @brief Alias pthread_t to one of the internal Windows types. */
+ typedef HANDLE pthread_t;
+ 
+@@ -79,12 +83,28 @@
+ }
+ 
+ /**
++ * @brief Proxy Windows @c WaitForSingleObject underneath a pthreads-like wrapper.
++ */
++static int pthread_join(
++	pthread_t thread,
++	void** value
++) {
++	static_cast<void>(value);
++	WaitForSingleObject(thread, INFINITE);
++	return 0;
++}
++#endif // !__MINGW32__
++
++/**
+  * @brief Manually set CPU group and thread affinity.
+  *
+  * This is needed on Windows 10 or older to allow benefit from large core count
+  * systems with more than 64 logical CPUs. The assignment is skipped on systems
+  * with a single processor group, as it is not necessary.
++ *
++ * Only available with the MSVC HANDLE-based pthread_t.
+  */
++#if !defined(__MINGW32__)
+ static void set_group_affinity(
+ 	pthread_t thread,
+ 	int thread_index
+@@ -118,22 +138,11 @@
+ 
+ 	// Set the affinity to the assigned group, and all supported cores
+ 	GROUP_AFFINITY affinity {};
+-	affinity.Mask = (1 << assign_group_cpu_count) - 1;
++	affinity.Mask = (1ULL << assign_group_cpu_count) - 1;
+ 	affinity.Group = assign_group;
+ 	SetThreadGroupAffinity(thread, &affinity, nullptr);
+ }
+-
+-/**
+- * @brief Proxy Windows @c WaitForSingleObject underneath a pthreads-like wrapper.
+- */
+-static int pthread_join(
+-	pthread_t thread,
+-	void** value
+-) {
+-	static_cast<void>(value);
+-	WaitForSingleObject(thread, INFINITE);
+-	return 0;
+-}
++#endif
+ 
+ /* See header for documentation */
+ int get_cpu_count()
+@@ -278,7 +287,8 @@
+ 		if (!error)
+ 		{
+ 			// Windows needs explicit thread assignment to handle large core count systems
+-			#if defined(_WIN32) && !defined(__CYGWIN__)
++			// (MSVC HANDLE-based path only; MinGW uses real pthread_t)
++			#if defined(_WIN32) && !defined(__CYGWIN__) && !defined(__MINGW32__)
+ 				set_group_affinity(
+ 					thread_descs[actual_thread_count].thread_handle,
+ 					actual_thread_count);
